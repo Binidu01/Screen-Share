@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remote Screen Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: linear-gradient(
+          135deg,
+          #0a0a0a 0%,
+          #1a1a2e 50%,
+          #16213e 100%
+        );
+        color: #fff;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Animated background particles */
+      .bg-particles {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .particle {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        background: rgba(64, 224, 255, 0.2);
+        border-radius: 50%;
+        animation: float 10s infinite linear;
+      }
+
+      @keyframes float {
+        0% {
+          transform: translateY(100vh) translateX(0);
+          opacity: 0;
+        }
+        10% {
+          opacity: 1;
+        }
+        90% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(-100px) translateX(50px);
+          opacity: 0;
+        }
+      }
+
+      .container {
+        position: relative;
+        z-index: 1;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        padding: 20px 30px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        animation: slideDown 0.8s ease-out;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .back-button {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 10px 15px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .back-button:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(64, 224, 255, 0.2);
+      }
+
+      .title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #40e0ff, #8a2be2);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.1);
+        padding: 8px 15px;
+        border-radius: 20px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4ade80;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(1.3);
+        }
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+      }
+
+      .control-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+      }
+
+      .control-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+      }
+
+      .control-btn.active {
+        background: linear-gradient(135deg, #40e0ff, #0ea5e9);
+        border: none;
+      }
+
+      .screen-container {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        animation: fadeIn 1s ease-out 0.3s both;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .screen-wrapper {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 15px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      .screen-wrapper:hover {
+        transform: scale(1.02);
+        box-shadow: 0 25px 50px rgba(64, 224, 255, 0.1);
+      }
+
+      .screen-wrapper::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #40e0ff, #8a2be2, #ff6b6b);
+        z-index: 1;
+      }
+
+      #screen {
+        width: 100%;
+        height: auto;
+        display: block;
+        transition: all 0.3s ease;
+        border-radius: 12px;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 12px;
+        z-index: 2;
+        transition: opacity 0.3s ease;
+      }
+
+      .loading-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #40e0ff;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 15px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-text {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 1rem;
+        font-weight: 500;
+      }
+
+      .stats-bar {
+        padding: 15px 30px;
+        background: rgba(255, 255, 255, 0.03);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .quality-selector {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 5px 10px;
+        color: white;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+
+      .quality-selector:focus {
+        outline: none;
+        border-color: #40e0ff;
+      }
+
+      .error-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .error-icon {
+        font-size: 3rem;
+        color: #ff6b6b;
+        margin-bottom: 20px;
+      }
+
+      .error-title {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        color: white;
+      }
+
+      .error-subtitle {
+        font-size: 1rem;
+        margin-bottom: 20px;
+      }
+
+      .retry-btn {
+        background: linear-gradient(135deg, #40e0ff, #0ea5e9);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+
+      .retry-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(64, 224, 255, 0.3);
+      }
+
+      @media (max-width: 768px) {
+        .header {
+          padding: 15px 20px;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .header-left {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .controls {
+          flex-wrap: wrap;
+        }
+
+        .screen-container {
+          padding: 10px;
+        }
+
+        .stats-bar {
+          flex-direction: column;
+          gap: 10px;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Animated background particles -->
+    <div class="bg-particles" id="particles"></div>
+
+    <div class="container">
+      <div class="header">
+        <div class="header-left">
+          <a href="/" class="back-button"> ← Back to Dashboard </a>
+          <h1 class="title" id="title">Loading...</h1>
+        </div>
+        <div class="header-right">
+          <div class="connection-status">
+            <span class="status-dot"></span>
+            <span>Live Stream</span>
+          </div>
+          <div class="controls">
+            <button class="control-btn active" id="autoRefresh">
+              Auto Refresh
+            </button>
+            <button class="control-btn" id="pauseBtn">Pause</button>
+            <select class="quality-selector" id="qualitySelect">
+              <option value="200">Fast (200ms)</option>
+              <option value="500">Normal (500ms)</option>
+              <option value="1000">Slow (1s)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen-container">
+        <div class="screen-wrapper">
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Connecting to device...</div>
+          </div>
+          <img id="screen" alt="Remote Screen" />
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-item">
+          <span>📊</span>
+          <span id="frameCount">Frames: 0</span>
+        </div>
+        <div class="stat-item">
+          <span>⚡</span>
+          <span id="refreshRate">Refresh: 200ms</span>
+        </div>
+        <div class="stat-item">
+          <span>🕒</span>
+          <span id="lastUpdate">Last update: --</span>
+        </div>
+        <div class="stat-item">
+          <span>📶</span>
+          <span id="connectionTime">Connected: --</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const clientId = new URLSearchParams(window.location.search).get(
+        "client"
+      );
+      const screenImg = document.getElementById("screen");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const title = document.getElementById("title");
+      const frameCountEl = document.getElementById("frameCount");
+      const refreshRateEl = document.getElementById("refreshRate");
+      const lastUpdateEl = document.getElementById("lastUpdate");
+      const connectionTimeEl = document.getElementById("connectionTime");
+      const autoRefreshBtn = document.getElementById("autoRefresh");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const qualitySelect = document.getElementById("qualitySelect");
+
+      let refreshInterval;
+      let frameCount = 0;
+      let isPaused = false;
+      let refreshRate = 200;
+      let connectionStartTime = Date.now();
+      let hasLoadedFirstFrame = false;
+
+      function createParticles() {
+        const particlesContainer = document.getElementById("particles");
+        for (let i = 0; i < 30; i++) {
+          const particle = document.createElement("div");
+          particle.className = "particle";
+          particle.style.left = Math.random() * 100 + "%";
+          particle.style.animationDelay = Math.random() * 10 + "s";
+          particle.style.animationDuration = Math.random() * 6 + 8 + "s";
+          particlesContainer.appendChild(particle);
+        }
+      }
+
+      function updateConnectionTime() {
+        const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        connectionTimeEl.textContent = `Connected: ${minutes}:${seconds
+          .toString()
+          .padStart(2, "0")}`;
+      }
+
+      function updateScreen() {
+        if (isPaused) return;
+
+        const timestamp = Date.now();
+        const imageUrl = `/latest/${clientId}.jpg?${timestamp}`;
+
+        const testImg = new Image();
+        testImg.onload = function () {
+          screenImg.src = imageUrl;
+          frameCount++;
+          frameCountEl.textContent = `Frames: ${frameCount}`;
+          lastUpdateEl.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+
+          if (!hasLoadedFirstFrame) {
+            hasLoadedFirstFrame = true;
+            setTimeout(() => {
+              loadingOverlay.classList.add("hidden");
+            }, 500);
+          }
+        };
+
+        testImg.onerror = function () {
+          console.warn("Failed to load frame from:", imageUrl);
+          if (!hasLoadedFirstFrame) {
+            showErrorState();
+          }
+        };
+
+        testImg.src = imageUrl;
+      }
+
+      function showErrorState() {
+        loadingOverlay.innerHTML = `
+          <div class="error-state">
+            <div class="error-icon">⚠️</div>
+            <div class="error-title">Connection Error</div>
+            <div class="error-subtitle">Unable to connect to device "${clientId}"</div>
+            <button class="retry-btn" onclick="retryConnection()">Retry Connection</button>
+          </div>
+        `;
+      }
+
+      function retryConnection() {
+        hasLoadedFirstFrame = false;
+        frameCount = 0;
+        loadingOverlay.innerHTML = `
+          <div class="loading-spinner"></div>
+          <div class="loading-text">Reconnecting...</div>
+        `;
+        loadingOverlay.classList.remove("hidden");
+        startRefreshing();
+      }
+
+      function startRefreshing() {
+        stopRefreshing();
+        updateScreen();
+        refreshInterval = setInterval(updateScreen, refreshRate);
+      }
+
+      function stopRefreshing() {
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+        }
+      }
+
+      autoRefreshBtn.addEventListener("click", () => {
+        if (isPaused) {
+          isPaused = false;
+          autoRefreshBtn.classList.add("active");
+          pauseBtn.classList.remove("active");
+          startRefreshing();
+        }
+      });
+
+      pauseBtn.addEventListener("click", () => {
+        if (!isPaused) {
+          isPaused = true;
+          pauseBtn.classList.add("active");
+          autoRefreshBtn.classList.remove("active");
+          stopRefreshing();
+        }
+      });
+
+      qualitySelect.addEventListener("change", (e) => {
+        refreshRate = parseInt(e.target.value);
+        refreshRateEl.textContent = `Refresh: ${refreshRate}ms`;
+        if (!isPaused) {
+          startRefreshing();
+        }
+      });
+
+      // Keyboard support
+      document.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          e.preventDefault();
+          pauseBtn.click();
+        }
+        if (e.code === "KeyR") {
+          retryConnection();
+        }
+      });
+
+      // Mouse click support on screen
+      screenImg.addEventListener("click", (e) => {
+        const rect = screenImg.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        // Send the click coordinates to the server
+        fetch(`/click/${clientId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ xPercent: x, yPercent: y }),
+        })
+          .then((res) => {
+            if (!res.ok) {
+              console.warn("Click failed:", res.status);
+            }
+          })
+          .catch((err) => {
+            console.error("Error sending click:", err);
+          });
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          stopRefreshing();
+        } else if (!isPaused) {
+          startRefreshing();
+        }
+      });
+
+      function init() {
+        if (!clientId) {
+          title.textContent = "No client specified";
+          showErrorState();
+          return;
+        }
+
+        title.textContent = `Remote Screen - ${clientId}`;
+        createParticles();
+        startRefreshing();
+        setInterval(updateConnectionTime, 1000);
+        updateConnectionTime();
+      }
+
+      init();
+    </script>
+  </body>
+</html>
